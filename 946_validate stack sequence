@@ -1,0 +1,15 @@
+from typing import List
+
+class Solution:
+    def validateStackSequences(self, pushed: List[int], popped: List[int]) -> bool:
+        stack = []
+        i = 0  # pointer for popped
+
+        for num in pushed:
+            stack.append(num)
+            # pop as long as top matches popped[i]
+            while stack and i < len(popped) and stack[-1] == popped[i]:
+                stack.pop()
+                i += 1
+
+        return not stack
