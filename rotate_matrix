@@ -1,0 +1,307 @@
+import java.util.*;
+
+public class Main {
+
+    static final double EPS = 1e-8;
+
+    static class Point {
+        double x, y;
+
+        Point(double x, double y) {
+            this.x = x;
+            this.y = y;
+        }
+    }
+
+    static class Segment {
+        Point a, b;
+
+        Segment(Point a, Point b) {
+            this.a = a;
+            this.b = b;
+        }
+    }
+
+    static List<Point> points = new ArrayList<>();
+    static List<List<Integer>> graph;
+    static boolean[] visited;
+    static int[] parent, depth;
+
+    static double cross(double ax, double ay,
+                        double bx, double by) {
+        return ax * by - ay * bx;
+    }
+
+    static boolean same(Point a, Point b) {
+        return Math.abs(a.x - b.x) < EPS
+            && Math.abs(a.y - b.y) < EPS;
+    }
+
+    static int getId(Point p) {
+        for (int i = 0; i < points.size(); i++) {
+            if (same(points.get(i), p)) {
+                return i;
+            }
+        }
+
+        points.add(p);
+        return points.size() - 1;
+    }
+
+    static Point intersection(Segment s1, Segment s2) {
+        double ax = s1.a.x, ay = s1.a.y;
+        double bx = s1.b.x, by = s1.b.y;
+        double cx = s2.a.x, cy = s2.a.y;
+        double dx = s2.b.x, dy = s2.b.y;
+
+        double rx = bx - ax;
+        double ry = by - ay;
+        double sx = dx - cx;
+        double sy = dy - cy;
+
+        double denominator = cross(rx, ry, sx, sy);
+
+        // Parallel or collinear segments
+        if (Math.abs(denominator) < EPS) {
+            return null;
+        }
+
+        double t = cross(cx - ax, cy - ay, sx, sy)
+                 / denominator;
+
+        double u = cross(cx - ax, cy - ay, rx, ry)
+                 / denominator;
+
+        if (t < -EPS || t > 1 + EPS ||
+            u < -EPS || u > 1 + EPS) {
+            return null;
+        }
+
+        return new Point(ax + t * rx, ay + t * ry);
+    }
+
+    static double distance(Point a, Point b) {
+        return Math.hypot(a.x - b.x, a.y - b.y);
+    }
+
+    static List<Integer> findCycle(int u, int par) {
+        visited[u] = true;
+        parent[u] = par;
+
+        for (int v : graph.get(u)) {
+            if (v == par) {
+                continue;
+            }
+
+            if (!visited[v]) {
+                depth[v] = depth[u] + 1;
+
+                List<Integer> result = findCycle(v, u);
+
+                if (result != null) {
+                    return result;
+                }
+            } else if (depth[v] < depth[u]) {
+                // Found a back edge: a cycle exists
+                List<Integer> cycle = new ArrayList<>();
+
+                int cur = u;
+
+                while (cur != v) {
+                    cycle.add(cur);
+                    cur = parent[cur];
+                }
+
+                cycle.add(v);
+                Collections.reverse(cycle);
+
+                return cycle;
+            }
+        }
+
+        return null;
+    }
+
+    static double polygonArea(List<Integer> cycle) {
+        double area = 0;
+        int n = cycle.size();
+
+        for (int i = 0; i < n; i++) {
+            Point a = points.get(cycle.get(i));
+            Point b = points.get(cycle.get((i + 1) % n));
+
+            area += a.x * b.y - a.y * b.x;
+        }
+
+        return Math.abs(area) / 2.0;
+    }
+
+    static double cyclePerimeter(List<Integer> cycle) {
+        double perimeter = 0;
+        int n = cycle.size();
+
+        for (int i = 0; i < n; i++) {
+            Point a = points.get(cycle.get(i));
+            Point b = points.get(cycle.get((i + 1) % n));
+
+            perimeter += distance(a, b);
+        }
+
+        return perimeter;
+    }
+
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+
+        int n = sc.nextInt();
+
+        Segment[] segments = new Segment[n];
+
+        double totalLength = 0;
+
+        for (int i = 0; i < n; i++) {
+            Point a = new Point(sc.nextInt(), sc.nextInt());
+            Point b = new Point(sc.nextInt(), sc.nextInt());
+
+            segments[i] = new Segment(a, b);
+
+            totalLength += distance(a, b);
+        }
+
+        // Store every endpoint and intersection on each segment.
+        List<List<Point>> segmentPoints = new ArrayList<>();
+
+        for (int i = 0; i < n; i++) {
+            List<Point> list = new ArrayList<>();
+            list.add(segments[i].a);
+            list.add(segments[i].b);
+            segmentPoints.add(list);
+        }
+
+        // Find intersections between all pairs of segments.
+        for (int i = 0; i < n; i++) {
+            for (int j = i + 1; j < n; j++) {
+                Point p = intersection(segments[i], segments[j]);
+
+                if (p != null) {
+                    segmentPoints.get(i).add(p);
+                    segmentPoints.get(j).add(p);
+                }
+            }
+        }
+
+        // Split each segment at its intersection points.
+        graph = new ArrayList<>();
+
+        for (int i = 0; i < n; i++) {
+            Segment s = segments[i];
+            List<Point> list = segmentPoints.get(i);
+
+            // Sort points in the order they appear on the segment.
+            list.sort((p1, p2) -> {
+                double d1 = (p1.x - s.a.x) * (p1.x - s.a.x)
+                          + (p1.y - s.a.y) * (p1.y - s.a.y);
+
+                double d2 = (p2.x - s.a.x) * (p2.x - s.a.x)
+                          + (p2.y - s.a.y) * (p2.y - s.a.y);
+
+                return Double.compare(d1, d2);
+            });
+
+            List<Point> unique = new ArrayList<>();
+
+            for (Point p : list) {
+                if (unique.isEmpty() ||
+                    !same(unique.get(unique.size() - 1), p)) {
+                    unique.add(p);
+                }
+            }
+
+            for (int j = 0; j < unique.size(); j++) {
+                getId(unique.get(j));
+            }
+        }
+
+        for (int i = 0; i < points.size(); i++) {
+            graph.add(new ArrayList<>());
+        }
+
+        for (int i = 0; i < n; i++) {
+            Segment s = segments[i];
+            List<Point> list = segmentPoints.get(i);
+
+            list.sort((p1, p2) -> {
+                double d1 = (p1.x - s.a.x) * (p1.x - s.a.x)
+                          + (p1.y - s.a.y) * (p1.y - s.a.y);
+
+                double d2 = (p2.x - s.a.x) * (p2.x - s.a.x)
+                          + (p2.y - s.a.y) * (p2.y - s.a.y);
+
+                return Double.compare(d1, d2);
+            });
+
+            List<Point> unique = new ArrayList<>();
+
+            for (Point p : list) {
+                if (unique.isEmpty() ||
+                    !same(unique.get(unique.size() - 1), p)) {
+                    unique.add(p);
+                }
+            }
+
+            for (int j = 0; j < unique.size() - 1; j++) {
+                int u = getId(unique.get(j));
+                int v = getId(unique.get(j + 1));
+
+                if (u != v) {
+                    graph.get(u).add(v);
+                    graph.get(v).add(u);
+                }
+            }
+        }
+
+        int size = graph.size();
+
+        visited = new boolean[size];
+        parent = new int[size];
+        depth = new int[size];
+
+        Arrays.fill(parent, -1);
+
+        List<Integer> cycle = null;
+
+        for (int i = 0; i < size; i++) {
+            if (!visited[i]) {
+                cycle = findCycle(i, -1);
+
+                if (cycle != null) {
+                    break;
+                }
+            }
+        }
+
+        if (cycle == null) {
+            System.out.println("Abandoned");
+            sc.close();
+            return;
+        }
+
+        double shapeArea = polygonArea(cycle);
+        double usedPerimeter = cyclePerimeter(cycle);
+
+        double remainingLength = Math.max(
+            0.0, totalLength - usedPerimeter
+        );
+
+        double computerArea =
+            remainingLength * remainingLength / (4.0 * Math.PI);
+
+        if (computerArea > shapeArea + EPS) {
+            System.out.println("Computer");
+        } else {
+            System.out.println("Kalyan");
+        }
+
+        sc.close();
+    }
+}
