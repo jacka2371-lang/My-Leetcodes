@@ -1,0 +1,36 @@
+class Solution {
+    public boolean isCompleteTree(TreeNode root) {
+        if (root == null) {
+            return true;
+        }
+
+        Queue<TreeNode> q = new LinkedList<>();
+        q.add(root);
+
+        boolean flag = false;
+
+        while (!q.isEmpty()) {
+            TreeNode current = q.poll();
+
+            if (current.left != null) {
+                if (flag) {
+                    return false;
+                }
+                q.add(current.left);
+            } else {
+                flag = true;
+            }
+
+            if (current.right != null) {
+                if (flag) {
+                    return false;
+                }
+                q.add(current.right);
+            } else {
+                flag = true;
+            }
+        }
+
+        return true;
+    }
+}
